@@ -10,46 +10,56 @@ import os
 
 chromedriver_autoinstaller.install()
 
-URL = urllib.parse.urlparse("https://dedragames.com/games/ovo/CrashTest1.4.4b/")
-OUTPUT_DIR = "versions/1.4.4b/"
+VERSIONS = {
+    "1.3.2": "https://dedragames.com/games/ovo/1.3.2/",
+    "1.3": "https://dedragames.com/games/ovo/1.3/",
+    "1.2": "https://dedragames.com/games/ovo/1.2/",
+    "1.1": "https://dedragames.com/games/ovo/1.1/",
+    "feedback": "https://ovofeedback.surge.sh/",
+    "devovo": "https://devovo.surge.sh/",
+    "itch": "https://html-classic.itch.zone/html/789098/",
+    "procanim": "https://procanim.surge.sh/"
+}
 
-driver = webdriver.Chrome()
-driver.get(URL.geturl())
+for version, base_url in VERSIONS.items():
+    URL = urllib.parse.urlparse(base_url)
+    OUTPUT_DIR = f"versions/{version}/"
 
-timings = []
+    driver = webdriver.Chrome()
+    driver.get(URL.geturl())
 
-if os.path.exists(OUTPUT_DIR):
-    shutil.rmtree(OUTPUT_DIR)
-os.mkdir(OUTPUT_DIR)
+    timings = []
 
-def download_file_process(url, path):
-    print("Downloading", url, "to", path)
-    urllib.request.urlretrieve(url, path)
+    if os.path.exists(OUTPUT_DIR):
+        shutil.rmtree(OUTPUT_DIR)
+    os.mkdir(OUTPUT_DIR)
 
-def download_file(url, path):
-    p = threading.Thread(target=download_file_process, args=(url, path))
-    p.start()
+    def download_file_process(url, path):
+        print("Downloading", url, "to", path)
+        urllib.request.urlretrieve(url, path)
 
-while True:
-    # get all requested files and put them in "files" dir
-    new_timings = driver.execute_script("return window.performance.getEntriesByType('resource')")
+    def download_file(url, path):
+        p = threading.Thread(target=download_file_process, args=(url, path))
+        p.start()
 
-    for timing in new_timings:
-        if timing not in timings:
-            timings.append(timing)
-            url = urllib.parse.urlparse(timing["name"])
-            path = OUTPUT_DIR + url.path[len(URL.path):]
+    while True:
+        new_timings = driver.execute_script("return window.performance.getEntriesByType('resource')")
 
-            if url.netloc != URL.netloc:
-                print("Skipping", timing["name"])
-                continue
+        for timing in new_timings:
+            if timing not in timings:
+                timings.append(timing)
+                url = urllib.parse.urlparse(timing["name"])
+                path = OUTPUT_DIR + url.path[len(URL.path):]
 
-            # create dirs
-            dirs = os.path.dirname(path)
-            if dirs:
-                os.makedirs(dirs, exist_ok=True)
+                if url.netloc != URL.netloc:
+                    print("Skipping", timing["name"])
+                    continue
 
-            # download file
-            print("Downloading", timing["name"], "to", path)
-            # urllib.request.urlretrieve(timing["name"], path)
-            download_file(timing["name"], path)
+                dirs = os.path.dirname(path)
+                if dirs:
+                    os.makedirs(dirs, exist_ok=True)
+
+                print("Downloading", timing["name"], "to", path)
+                download_file(timing["name"], path)
+
+    driver.quit()
